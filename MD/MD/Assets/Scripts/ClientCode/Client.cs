@@ -54,6 +54,8 @@ public class Client: MonoBehaviour
     public static string Name { get; private set; }
 
     public const int port = 52515;
+    public const float timeOutTime = 15;
+
     public static TcpClient tcpClient { get; private set; }
     private static NetworkStream netStream { get; set; }
 
@@ -75,10 +77,13 @@ public class Client: MonoBehaviour
         Name = name;
         netStream = client.GetStream();
         TimeOutFlag timeOutFlag = new TimeOutFlag();
-        InterfaceFlag interfaceFlag = new InterfaceFlag();
+        FlagInterface flagInterface = new FlagInterface();
+
+        singleton.StartCoroutine(singleton.TimeOutRoutine(timeOutFlag));
+        singleton.StartCoroutine(singleton.InterfaceRoutine(flagInterface, timeOutFlag));
 
         clientThread = new Thread(new ParameterizedThreadStart(ClientSideThread));
-        clientThread.Start(interfaceFlag); //WE ARE WORKING BABY!
+        clientThread.Start(flagInterface); //WE ARE WORKING BABY!
     }
 
     #region Game 
@@ -86,18 +91,54 @@ public class Client: MonoBehaviour
     private static void ClientSideThread(object flag)
     {
         Debug.Log("Client Side thread has now commenced!");
-        InterfaceFlag interfaceFlag = (InterfaceFlag)flag;
+        FlagInterface flagInterface = (FlagInterface)flag;
 
+        flagInterface.
         WriteToServer("MD " + Name);
 
     }
 
     private IEnumerator TimeOutRoutine(TimeOutFlag flag)
     {
-
+        while (true)
+        {
+            float time = timeOutTime;
+            while(time >= 0)
+            {
+                yield return new WaitForEndOfFrame();
+                time -= Time.deltaTime;
+                if (flag.resetTimer)
+                {
+                    flag.resetTimer = false;
+                    time = timeOutTime;
+                }
+                if (flag.exit)
+                {
+                    yield break;
+                }
+            }
+        }
     }
 
-    private IEnumerator InterfaceRoutine(InterfaceFlag flag, TimeOutFlag timeOutFlag)
+    private IEnumerator InterfaceRoutine(FlagInterface flag, TimeOutFlag timeOutFlag)
+    {
+        while (tcpClient != null)
+        {
+            yield return new WaitForEndOfFrame();
+            while(flag.currentFlags.Count != 0)
+            {
+                var processed = flag.currentFlags.Dequeue();
+                switch (processed.interfaceMessage)
+                {
+                    case InterfaceMessage.resetTimeout:
+                        timeOutFlag.resetTimer = true;
+                        break;
+                }
+            }
+        }
+    }
+
+    private void OnTimeOut()
     {
 
     }
@@ -138,12 +179,32 @@ public class Client: MonoBehaviour
     private class TimeOutFlag
     {
         public bool resetTimer = false;
+        public bool exit = false;
     }
 
-    private class InterfaceFlag
+    private class FlagInterface
     {
-        
+        public Queue<InterfaceDataFlag> currentFlags = new Queue<InterfaceDataFlag>();
+
+        public void EnqueueFlag(InterfaceDataFlag flag)
+        {
+            currentFlags.Enqueue(flag);
+        }
     }
+
+    private struct InterfaceDataFlag
+    {
+        public InterfaceMessage interfaceMessage;
+        public float val;
+
+        public InterfaceDataFlag(InterfaceMessage flagMsg, float val)
+        {
+            this.interfaceMessage = flagMsg;
+            this.val = val;
+        }
+    }
+
+    private enum InterfaceMessage { resetTimeout }
 
 }
 
