@@ -1,0 +1,9 @@
+
+*.meta
+MD/MD/Library
+MD/MD/Logs
+MD/MD/obj
+MD/MD/Packages
+MD/MD/.vs
+MD/MD/ProjectSettings
+MD/MD/Temp
