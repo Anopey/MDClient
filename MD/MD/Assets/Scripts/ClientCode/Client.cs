@@ -62,6 +62,8 @@ public class Client: MonoBehaviour
 
     private static Thread clientThread;
 
+    private static FlagInterface activeFlagInterface;
+
     public static void SetClient(TcpClient client, string name)
     {
         if (tcpClient == null)
@@ -79,6 +81,8 @@ public class Client: MonoBehaviour
         netStream = client.GetStream();
         TimeOutFlag timeOutFlag = new TimeOutFlag();
         FlagInterface flagInterface = new FlagInterface();
+        activeFlagInterface = flagInterface;
+
 
         singleton.StartCoroutine(singleton.TimeOutRoutine(timeOutFlag));
         singleton.StartCoroutine(singleton.InterfaceRoutine(flagInterface, timeOutFlag));
