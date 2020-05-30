@@ -9,17 +9,71 @@ using System;
 public class MenuUX : MonoBehaviour
 {
     [SerializeField]
+    private GameObject[] connectionObjects;
+
+    [SerializeField]
+    private GameObject[] queueObjects;
+
+    [SerializeField]
     private InputField ipField, nameField;
+
+    [SerializeField]
+    private Toggle regularIPToggle;
 
     [SerializeField]
     private Text infoText;
 
     private const string RegularServerIP = "185.163.47.170";
 
+    #region Singleton Initialization
+
+    private static MenuUX singleton;
+
     void Start()
     {
-        //START BE FOR TEST PURPOSES
-        EstablishClient(RegularServerIP, 52515, "ClientBoi");
+        if (singleton == null)
+        {
+            singleton = this;
+            //THIS BE FOR TEST PURPOSES
+            //EstablishClient(RegularServerIP, 52515, "ClientBoi");
+            return;
+        }
+        Destroy(gameObject);
+    }
+
+    private void OnDestroy()
+    {
+        if(singleton == this)
+        {
+            singleton = null;
+        }
+    }
+
+    #endregion
+
+    #region Initial Connection
+
+    public void TryEstablishConnection()
+    {
+        if (ipField.interactable)
+            ValidateFormsAndConnect();
+        else
+            ValidateNameAndConnectRegular();
+    }
+
+
+    public void EnterRegularIPChecker(bool inp)
+    {
+        if (regularIPToggle.isOn)
+        {
+            ipField.interactable = false;
+            ipField.text = RegularServerIP.ToString();
+        }
+        else
+        {
+            ipField.interactable = true;
+            ipField.text = "";
+        }
     }
 
     private bool ValidateFormsAndConnect()
@@ -61,7 +115,7 @@ public class MenuUX : MonoBehaviour
             infoText.text = "Name cannot contain spaces!";
             return false;
         }
-        return EstablishClient(RegularServerIP, 52515, nameField.text);
+        return EstablishClient(RegularServerIP, Client.port, nameField.text);
     }
 
     private bool EstablishClient(string ip, int port, string name) //TODO Add use default host option, with our Moldovian IP
@@ -80,4 +134,21 @@ public class MenuUX : MonoBehaviour
         }
     }
 
+    #endregion
+
+    #region Queue Construction
+
+    public void RevealQueue()
+    {
+        foreach(GameObject g in connectionObjects)
+        {
+            g.SetActive(false);
+        }
+        foreach (GameObject g in queueObjects)
+        {
+            g.SetActive(true);
+        }
+    }
+
+    #endregion
 }
