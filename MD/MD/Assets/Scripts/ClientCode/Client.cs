@@ -8,7 +8,7 @@ using System.Text;
 using System.Threading;
 using System;
 
-public class Client: MonoBehaviour
+public class Client : MonoBehaviour
 {
 
     #region Singleton
@@ -17,7 +17,7 @@ public class Client: MonoBehaviour
 
     void Start()
     {
-        if(singleton != null)
+        if (singleton != null)
         {
             Destroy(gameObject);
             return;
@@ -28,12 +28,13 @@ public class Client: MonoBehaviour
 
     void OnDestroy()
     {
-        if(singleton == this)
+        if (singleton == this)
         {
             singleton = null;
             if (tcpClient != null)
             {
                 clientThread.Abort();
+                tendThread.Abort();
                 WriteToServer("MD CLOSE\n");
                 netStream.Close();
                 tcpClient = null;
@@ -61,6 +62,7 @@ public class Client: MonoBehaviour
     private static NetworkStream netStream { get; set; }
 
     private static Thread clientThread;
+    private static Thread tendThread;
 
     private static FlagInterface activeFlagInterface;
 
@@ -95,6 +97,8 @@ public class Client: MonoBehaviour
 
     #region Client Side Thread
 
+    private static readonly object _clientBoiBusy = new object();
+
     private static void ClientSideThread(object flag)
     {
         Debug.Log("Client Side thread has now commenced!");
@@ -111,14 +115,93 @@ public class Client: MonoBehaviour
 
         string response = ReadFromServer();
         EnqueueNoTimeoutFlag(flagInterface);
-        if(response != "MD OK\n")
+        if (response != "MD OK\n")
         {
-            WriteToServer("MD CLOSE");
+            WriteToServer("MD CLOSE\n");
             EnqueueErrorFlag(flagInterface, "Server responded with " + response + " instead of verifying login.");
             return;
         }
         //we got the OK!
         Debug.Log("Established connection to client.");
+        //TODO ADD MORE OPTIONS ETC LATER ON RATHER THAN AUTOMATICALLY ENQUEING. ROOM NUMBER ENTERING ETC FOR EXAMPLE OR SONG CHOICE!
+        MenuUX.GetSingleton().RevealQueue();
+        WriteToServer("MD ENQUEUE\n");
+        response = ReadFromServer();
+        EnqueueNoTimeoutFlag(flagInterface);
+
+        var fields = response.Split(' ');
+        int enqueued = 0;
+        if (!int.TryParse(fields[2], out enqueued))
+        {
+            WriteToServer("MD CLOSE\n");
+            EnqueueErrorFlag(flagInterface, "Server responded with " + response + " instead of verifying enqueue process with valid number.");
+            return;
+        }
+
+        MenuUX.GetSingleton().UpdateEnqueuedNumber(enqueued);
+
+        tendThread = new Thread(new ParameterizedThreadStart(CallClientSidePerpetualTend));
+        tendThread.Start(flagInterface);
+        ClientSideThreadPerpetualListen(flagInterface);
+    }
+
+    private static void ClientSideThreadPerpetualListen(FlagInterface flagInterface)
+    {
+        try
+        {
+            while (tcpClient != null)
+            {
+
+                string response = ReadFromServer();
+                lock (_clientBoiBusy)
+                {
+                    response = response.Substring(0, response.Length - 1); //get rid of the \n
+                    EnqueueNoTimeoutFlag(flagInterface);
+                    switch (response)
+                    {
+                        case "MD INVALID":
+                            EnqueueErrorFlag(flagInterface, "Server responded with " + response);
+                            break;
+                        case "MD NO TIMEOUT":
+                            WriteToServer("MD NO TIMEOUT\n");
+                            break;
+                        default:
+                            EnqueueErrorFlag(flagInterface, "Unexpected response from server: " + response);
+                            break;
+                    }
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            EnqueueErrorFlag(flagInterface, e.ToString());
+        }
+    }
+
+    private static void CallClientSidePerpetualTend(object flagBoi)
+    {
+        ClientSidePerpetualTend((FlagInterface)flagBoi);
+    }
+
+    private static void ClientSidePerpetualTend(FlagInterface flagInterface)
+    {
+        while (tcpClient != null)
+        {
+            lock (_clientBoiBusy)
+            {
+                while (flagInterface.clientThreadFlags.Count != 0)
+                {
+
+                    var processed = flagInterface.clientThreadFlags.Dequeue();
+                    switch (processed.interfaceMessage)
+                    {
+                        case ClientThreadMessage.close:
+                            WriteToServer("MD CLOSE\n");
+                            break;
+                    }
+                }
+            }
+        }
     }
 
     #endregion
@@ -128,7 +211,7 @@ public class Client: MonoBehaviour
         while (true)
         {
             float time = timeOutTime;
-            while(time >= 0)
+            while (time >= 0)
             {
                 yield return new WaitForEndOfFrame();
                 time -= Time.deltaTime;
@@ -142,6 +225,7 @@ public class Client: MonoBehaviour
                     yield break;
                 }
             }
+            EnqueueCloseFlag(activeFlagInterface);
         }
     }
 
@@ -150,9 +234,9 @@ public class Client: MonoBehaviour
         while (tcpClient != null)
         {
             yield return new WaitForEndOfFrame();
-            while(flag.currentFlags.Count != 0)
+            while (flag.gameInterfaceFlags.Count != 0)
             {
-                var processed = flag.currentFlags.Dequeue();
+                var processed = flag.gameInterfaceFlags.Dequeue();
                 switch (processed.interfaceMessage)
                 {
                     case InterfaceMessage.resetTimeout:
@@ -189,7 +273,7 @@ public class Client: MonoBehaviour
             netStream.Write(data, 0, data.Length);
             return true;
         }
-        catch(Exception e)
+        catch (Exception e)
         {
             Debug.LogError(e);
             return false;
@@ -204,12 +288,15 @@ public class Client: MonoBehaviour
             netStream.Read(response, 0, (int)tcpClient.ReceiveBufferSize);
 
             string returnData = Encoding.UTF8.GetString(response);
+            int indexof = returnData.IndexOf('\0');
+            returnData = returnData.Substring(0, indexof == -1 ? returnData.Length : indexof);
             if (displayNetDebug)
             {
                 Debug.Log("Server Response: " + returnData);
             }
             return returnData;
-        }catch(Exception e)
+        }
+        catch (Exception e)
         {
             Debug.LogError(e);
             return "";
@@ -233,6 +320,15 @@ public class Client: MonoBehaviour
 
     #endregion
 
+    #region Common Client Flags
+
+    private static void EnqueueCloseFlag(FlagInterface flagInterface)
+    {
+        flagInterface.EnqueueClientThreadFlag(new ClientThreadFlag(ClientThreadMessage.close, 0, ""));
+    }
+
+    #endregion
+
     private class TimeOutFlag
     {
         public bool resetTimer = false;
@@ -241,10 +337,15 @@ public class Client: MonoBehaviour
 
     private class FlagInterface
     {
-        public Queue<InterfaceDataFlag> currentFlags = new Queue<InterfaceDataFlag>();
+        public Queue<InterfaceDataFlag> gameInterfaceFlags = new Queue<InterfaceDataFlag>();
+        public Queue<ClientThreadFlag> clientThreadFlags = new Queue<ClientThreadFlag>();
         public void EnqueueInterfaceFlag(InterfaceDataFlag flag)
         {
-            currentFlags.Enqueue(flag);
+            gameInterfaceFlags.Enqueue(flag);
+        }
+        public void EnqueueClientThreadFlag(ClientThreadFlag flag)
+        {
+            clientThreadFlags.Enqueue(flag);
         }
     }
 
@@ -263,7 +364,21 @@ public class Client: MonoBehaviour
         }
     }
 
+    private struct ClientThreadFlag
+    {
+        public ClientThreadMessage interfaceMessage;
+        public float val;
+        public string msg;
+
+        public ClientThreadFlag(ClientThreadMessage flagMsg, float val, string msg)
+        {
+            this.interfaceMessage = flagMsg;
+            this.val = val;
+            this.msg = msg;
+        }
+    }
+
     private enum InterfaceMessage { resetTimeout, raiseError }
-    private enum ClientThreadMessage { enqueue}
+    private enum ClientThreadMessage { close, enqueue }
 }
 

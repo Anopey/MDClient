@@ -49,6 +49,11 @@ public class MenuUX : MonoBehaviour
         }
     }
 
+    public static MenuUX GetSingleton()
+    {
+        return singleton;
+    }
+
     #endregion
 
     #region Initial Connection
@@ -148,6 +153,11 @@ public class MenuUX : MonoBehaviour
         {
             g.SetActive(true);
         }
+    }
+
+    public void UpdateEnqueuedNumber(int enqueued)
+    {
+
     }
 
     #endregion
