@@ -6,6 +6,7 @@ using System.Net;
 using Assets.Scripts.ClientCode;
 using System.Text;
 using System.Threading;
+using System;
 
 public class Client: MonoBehaviour
 {
@@ -88,15 +89,34 @@ public class Client: MonoBehaviour
 
     #region Game 
 
+    #region Client Side Thread
+
     private static void ClientSideThread(object flag)
     {
         Debug.Log("Client Side thread has now commenced!");
         FlagInterface flagInterface = (FlagInterface)flag;
 
-        flagInterface.
-        WriteToServer("MD " + Name);
+        ClientSideThreadServerInitialization(flagInterface);
 
     }
+
+    private static void ClientSideThreadServerInitialization(FlagInterface flagInterface)
+    {
+        EnqueueNoTimeoutFlag(flagInterface);
+        WriteToServer("MD " + Name);
+
+        string response = ReadFromServer();
+        EnqueueNoTimeoutFlag(flagInterface);
+        if(response != "MD OK")
+        {
+            WriteToServer("MD CLOSE");
+            ErrorScene.LoadError("Server responded with " + response + " instead of verifying login.");
+        }
+        //we got the OK!
+        Debug.Log("Established connection to client.");
+    }
+
+    #endregion
 
     private IEnumerator TimeOutRoutine(TimeOutFlag flag)
     {
@@ -149,28 +169,52 @@ public class Client: MonoBehaviour
 
     public static bool WriteToServer(string message)
     {
-        if (tcpClient == null)
-            return false;
-        byte[] data = Utils.GetBytes(message);
-        if (displayNetDebug)
+        try
         {
-            Debug.Log("Writing to server: " + message);
+            if (tcpClient == null)
+                return false;
+            byte[] data = Utils.GetBytes(message);
+            if (displayNetDebug)
+            {
+                Debug.Log("Writing to server: " + message);
+            }
+            tcpClient.GetStream().Write(data, 0, data.Length);
+            return true;
         }
-        tcpClient.GetStream().Write(data, 0, data.Length);
-        return true;
+        catch(Exception e)
+        {
+            Debug.LogError(e.Message + " with stack: " + e.StackTrace);
+            return false;
+        }
     }
 
     public static string ReadFromServer()
     {
-        byte[] response = new byte[tcpClient.ReceiveBufferSize];
-        netStream.Read(response, 0, (int)tcpClient.ReceiveBufferSize);
-
-        string returnData = Encoding.UTF8.GetString(response);
-        if (displayNetDebug)
+        try
         {
-            Debug.Log("Server Response: " + returnData);
+            byte[] response = new byte[tcpClient.ReceiveBufferSize];
+            netStream.Read(response, 0, (int)tcpClient.ReceiveBufferSize);
+
+            string returnData = Encoding.UTF8.GetString(response);
+            if (displayNetDebug)
+            {
+                Debug.Log("Server Response: " + returnData);
+            }
+            return returnData;
+        }catch(Exception e)
+        {
+            Debug.LogError(e.Message + " with stack: " + e.StackTrace);
+            return "";
         }
-        return returnData;
+    }
+
+    #endregion
+
+    #region Common Flags
+
+    private static void EnqueueNoTimeoutFlag(FlagInterface flagInterface)
+    {
+        flagInterface.EnqueueInterfaceFlag(new InterfaceDataFlag(InterfaceMessage.resetTimeout, 0));
     }
 
 
@@ -185,10 +229,26 @@ public class Client: MonoBehaviour
     private class FlagInterface
     {
         public Queue<InterfaceDataFlag> currentFlags = new Queue<InterfaceDataFlag>();
-
-        public void EnqueueFlag(InterfaceDataFlag flag)
+        public Queue<ClientThreadDataFlag> currentClientFlags = new Queue<ClientThreadDataFlag>();
+        public void EnqueueInterfaceFlag(InterfaceDataFlag flag)
         {
             currentFlags.Enqueue(flag);
+        }
+        public void EnqueueClientThreadFlag(ClientThreadDataFlag flag)
+        {
+            currentClientFlags.Enqueue(flag);
+        }
+    }
+
+    private struct ClientThreadDataFlag
+    {
+        public ClientThreadMessage interfaceMessage;
+        public float val;
+
+        public ClientThreadDataFlag(ClientThreadMessage flagMsg, float val)
+        {
+            this.interfaceMessage = flagMsg;
+            this.val = val;
         }
     }
 
@@ -205,6 +265,6 @@ public class Client: MonoBehaviour
     }
 
     private enum InterfaceMessage { resetTimeout }
-
+    private enum ClientThreadMessage { enqueue}
 }
 

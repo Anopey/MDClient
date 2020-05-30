@@ -20,6 +20,7 @@ public class ErrorScene : MonoBehaviour
     public static void LoadError(string text)
     {
         errorText = text;
+        Debug.LogError(text);
         SceneManager.LoadScene("ErrorScene");
     }
 
