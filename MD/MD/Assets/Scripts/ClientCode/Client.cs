@@ -34,7 +34,7 @@ public class Client: MonoBehaviour
             if (tcpClient != null)
             {
                 clientThread.Abort();
-                WriteToServer("MD CLOSE");
+                WriteToServer("MD CLOSE\n");
                 netStream.Close();
                 tcpClient = null;
                 netStream = null;
@@ -72,7 +72,7 @@ public class Client: MonoBehaviour
         }
         else
         {
-            WriteToServer("MD CLOSE");
+            WriteToServer("MD CLOSE\n");
             tcpClient.Close();
             tcpClient = client;
         }
@@ -107,14 +107,15 @@ public class Client: MonoBehaviour
     private static void ClientSideThreadServerInitialization(FlagInterface flagInterface)
     {
         EnqueueNoTimeoutFlag(flagInterface);
-        WriteToServer("MD " + Name);
+        WriteToServer("MD " + Name + "\n");
 
         string response = ReadFromServer();
         EnqueueNoTimeoutFlag(flagInterface);
-        if(response != "MD OK")
+        if(response != "MD OK\n")
         {
             WriteToServer("MD CLOSE");
-            ErrorScene.LoadError("Server responded with " + response + " instead of verifying login.");
+            EnqueueErrorFlag(flagInterface, "Server responded with " + response + " instead of verifying login.");
+            return;
         }
         //we got the OK!
         Debug.Log("Established connection to client.");
@@ -157,6 +158,9 @@ public class Client: MonoBehaviour
                     case InterfaceMessage.resetTimeout:
                         timeOutFlag.resetTimer = true;
                         break;
+                    case InterfaceMessage.raiseError:
+                        ErrorScene.LoadError(processed.msg);
+                        break;
                 }
             }
         }
@@ -182,7 +186,7 @@ public class Client: MonoBehaviour
             {
                 Debug.Log("Writing to server: " + message);
             }
-            tcpClient.GetStream().Write(data, 0, data.Length);
+            netStream.Write(data, 0, data.Length);
             return true;
         }
         catch(Exception e)
@@ -218,7 +222,12 @@ public class Client: MonoBehaviour
 
     private static void EnqueueNoTimeoutFlag(FlagInterface flagInterface)
     {
-        flagInterface.EnqueueInterfaceFlag(new InterfaceDataFlag(InterfaceMessage.resetTimeout, 0));
+        flagInterface.EnqueueInterfaceFlag(new InterfaceDataFlag(InterfaceMessage.resetTimeout, 0, ""));
+    }
+
+    private static void EnqueueErrorFlag(FlagInterface flagInterface, string e)
+    {
+        flagInterface.EnqueueInterfaceFlag(new InterfaceDataFlag(InterfaceMessage.raiseError, 0, e));
     }
 
 
@@ -233,42 +242,28 @@ public class Client: MonoBehaviour
     private class FlagInterface
     {
         public Queue<InterfaceDataFlag> currentFlags = new Queue<InterfaceDataFlag>();
-        public Queue<ClientThreadDataFlag> currentClientFlags = new Queue<ClientThreadDataFlag>();
         public void EnqueueInterfaceFlag(InterfaceDataFlag flag)
         {
             currentFlags.Enqueue(flag);
         }
-        public void EnqueueClientThreadFlag(ClientThreadDataFlag flag)
-        {
-            currentClientFlags.Enqueue(flag);
-        }
     }
 
-    private struct ClientThreadDataFlag
-    {
-        public ClientThreadMessage interfaceMessage;
-        public float val;
-
-        public ClientThreadDataFlag(ClientThreadMessage flagMsg, float val)
-        {
-            this.interfaceMessage = flagMsg;
-            this.val = val;
-        }
-    }
 
     private struct InterfaceDataFlag
     {
         public InterfaceMessage interfaceMessage;
         public float val;
+        public string msg;
 
-        public InterfaceDataFlag(InterfaceMessage flagMsg, float val)
+        public InterfaceDataFlag(InterfaceMessage flagMsg, float val, string msg)
         {
             this.interfaceMessage = flagMsg;
             this.val = val;
+            this.msg = msg;
         }
     }
 
-    private enum InterfaceMessage { resetTimeout }
+    private enum InterfaceMessage { resetTimeout, raiseError }
     private enum ClientThreadMessage { enqueue}
 }
 

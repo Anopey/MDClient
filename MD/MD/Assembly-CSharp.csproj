@@ -68,6 +68,7 @@
     <Compile Include="Assets\Scripts\Effects\EffectsPress.cs" />
     <Compile Include="Assets\Scripts\Effects\fadeAndBig.cs" />
     <Compile Include="Assets\Scripts\ErrorScene.cs" />
+    <Compile Include="Assets\Scripts\Game\Song.cs" />
     <Compile Include="Assets\Scripts\MenuUX.cs" />
     <Reference Include="Unity.Timeline.Editor">
       <HintPath>D:/Foo/Go-Workspace/Workspace/src/github.com/Anopey/MD/MDClient/MDClient/MD/MD/Library/ScriptAssemblies/Unity.Timeline.Editor.dll</HintPath>
