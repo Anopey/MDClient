@@ -187,7 +187,7 @@ public class Client: MonoBehaviour
         }
         catch(Exception e)
         {
-            Debug.LogError(e.Message + " with stack: " + e.StackTrace);
+            Debug.LogError(e);
             return false;
         }
     }
@@ -207,7 +207,7 @@ public class Client: MonoBehaviour
             return returnData;
         }catch(Exception e)
         {
-            Debug.LogError(e.Message + " with stack: " + e.StackTrace);
+            Debug.LogError(e);
             return "";
         }
     }

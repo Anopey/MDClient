@@ -74,6 +74,7 @@ public class MenuUX : MonoBehaviour
         }
         catch (Exception e)
         {
+            Debug.LogError(e);
             infoText.text = e.Message;
             return false;
         }
