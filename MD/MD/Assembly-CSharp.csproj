@@ -64,15 +64,17 @@
   <ItemGroup>
     <Compile Include="Assets\MenuAnimation.cs" />
     <Compile Include="Assets\Scripts\ButtonHandler.cs" />
+    <Compile Include="Assets\Scripts\Circle_Manager.cs" />
     <Compile Include="Assets\Scripts\ClientCode\Client.cs" />
     <Compile Include="Assets\Scripts\ClientCode\Utils.cs" />
     <Compile Include="Assets\Scripts\Effects\EffectsPress.cs" />
     <Compile Include="Assets\Scripts\Effects\fadeAndBig.cs" />
-    <Compile Include="Assets\Scripts\ErrorScene.cs" />
     <Compile Include="Assets\Scripts\Game\GameManager.cs" />
     <Compile Include="Assets\Scripts\Game\Song.cs" />
-    <Compile Include="Assets\Scripts\MenuUX.cs" />
+    <Compile Include="Assets\Scripts\Game\SongManager.cs" />
     <Compile Include="Assets\Scripts\Song_Mapping.cs" />
+    <Compile Include="Assets\Scripts\UX\MenuUX.cs" />
+    <Compile Include="Assets\Scripts\Utilities\ErrorScene.cs" />
     <Reference Include="Unity.Timeline.Editor">
       <HintPath>D:/Foo/Go-Workspace/Workspace/src/github.com/Anopey/MD/MDClient/MDClient/MD/MD/Library/ScriptAssemblies/Unity.Timeline.Editor.dll</HintPath>
     </Reference>

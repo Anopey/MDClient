@@ -5,6 +5,7 @@ using UnityEngine;
 public class Song : MonoBehaviour
 {
 
+    private float currentSecond = 0;
 
 
     #region Drum Integration
@@ -28,6 +29,15 @@ public class Song : MonoBehaviour
     {
         return 500f;
     }
+    #endregion
+
+    #region Tempo System for Online Play
+
+    public float GetCurrentTempo()
+    {
+        return 400;
+    }
+
     #endregion
 
 }

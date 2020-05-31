@@ -7,6 +7,7 @@ using Assets.Scripts.ClientCode;
 using System.Text;
 using System.Threading;
 using System;
+using UnityEngine.SceneManagement;
 
 public class Client : MonoBehaviour
 {
@@ -22,6 +23,7 @@ public class Client : MonoBehaviour
             Destroy(gameObject);
             return;
         }
+        GameManager.SubscribeGameSceneLoad(OnGameSceneLoaded);
         singleton = this;
         DontDestroyOnLoad(gameObject);
     }
@@ -65,6 +67,9 @@ public class Client : MonoBehaviour
     private static Thread tendThread;
 
     private static FlagInterface activeFlagInterface;
+
+    private static string latestOpponentName;
+    private static float latestOpponentScore = 0;
 
     public static void SetClient(TcpClient client, string name)
     {
@@ -124,21 +129,8 @@ public class Client : MonoBehaviour
         //we got the OK!
         Debug.Log("Established connection to client.");
         //TODO ADD MORE OPTIONS ETC LATER ON RATHER THAN AUTOMATICALLY ENQUEING. ROOM NUMBER ENTERING ETC FOR EXAMPLE OR SONG CHOICE!
-        MenuUX.GetSingleton().RevealQueue();
+        EnqueueQueueMenuActivation(flagInterface);
         WriteToServer("MD ENQUEUE\n");
-        response = ReadFromServer();
-        EnqueueNoTimeoutFlag(flagInterface);
-
-        var fields = response.Split(' ');
-        int enqueued = 0;
-        if (!int.TryParse(fields[2], out enqueued))
-        {
-            WriteToServer("MD CLOSE\n");
-            EnqueueErrorFlag(flagInterface, "Server responded with " + response + " instead of verifying enqueue process with valid number.");
-            return;
-        }
-
-        MenuUX.GetSingleton().UpdateEnqueuedNumber(enqueued);
 
         tendThread = new Thread(new ParameterizedThreadStart(CallClientSidePerpetualTend));
         tendThread.Start(flagInterface);
@@ -159,11 +151,23 @@ public class Client : MonoBehaviour
                     response = response.Substring(0, response.Length - 1); //get rid of the \n
                     var fields = response.Split(' ');
                     float valuePassed = 0;
+                    string messagePassed = "";
                     if (fields.Length == 3)
                     {
-                        if(!float.TryParse(fields[2], out valuePassed)){
-                            Debug.LogError("Invalid response from server: " + response);
-                            continue;
+                        if (fields[2][0] == '~')
+                        {
+                            //this be string msg.
+                            fields[2] = fields[2].Remove(0,1);
+                            messagePassed = fields[2];
+                        }
+                        else
+                        {
+                            //this be float msg.
+                            if (!float.TryParse(fields[2], out valuePassed))
+                            {
+                                Debug.LogError("Invalid response from server: " + response);
+                                continue;
+                            }
                         }
                     }
                     EnqueueNoTimeoutFlag(flagInterface);
@@ -173,14 +177,30 @@ public class Client : MonoBehaviour
                         case "MD INVALID":
                             EnqueueErrorFlag(flagInterface, "Server responded with " + response);
                             break;
-                        case "MD NO TIMEOUT":
-                            WriteToServer("MD NO TIMEOUT\n");
+                        case "MD NO-TIMEOUT":
+                            WriteToServer("MD NO-TIMEOUT\n");
                             break;
                         case "MD QUEUE":
                             if(MenuUX.GetSingleton() != null)
                             {
-                                MenuUX.GetSingleton().UpdateEnqueuedNumber((int)valuePassed);
+                                EnqueueUpdateEnqueuedNumber(flagInterface, (int)valuePassed);
                             }
+                            break;
+                        case "MD GAME FDISCONNECT":
+                            EnqueueErrorFlag(flagInterface, "Your opponent has lost connection to the server ;_;");
+                            break;
+                        case "MD GAME-INIT":
+                            Debug.Log("Game shall be initalized with player: " + messagePassed);
+                            EnqueueGameStartFlag(flagInterface, messagePassed);
+                            break;
+                        case "MD GAME-FAIL":
+                            EnqueueErrorFlag(flagInterface, "You and your opponent were out of tolerable sync and both lost ;_;" );
+                            break;
+                        case "MD GAME-INDIC":
+                            EnqueueUpdateServerPos(flagInterface, valuePassed);
+                            break;
+                        case "MD GAME-OPP":
+                            EnqueueUpdateOpponentPos(flagInterface, valuePassed);
                             break;
                         default:
                             EnqueueErrorFlag(flagInterface, "Unexpected response from server: " + response);
@@ -215,13 +235,69 @@ public class Client : MonoBehaviour
                         case ClientThreadMessage.close:
                             WriteToServer("MD CLOSE\n");
                             break;
+                        case ClientThreadMessage.ready:
+                            WriteToServer("MD GAME READY " + (processed.val).ToString() + "\n");
+                            break;
+                        case ClientThreadMessage.updateGamePlayerPos:
+                            WriteToServer("MD GAME POS " + (processed.val).ToString() + "\n");
+                            break;
                     }
                 }
             }
         }
     }
 
+    #region Event Subscribers
+
+    private static void OnGameSceneLoaded()
+    {
+        latestOpponentScore = 0;
+        GameManager.GetSingleton().InitializeGameValues(latestOpponentName);
+        EnqueueClientThreadGameReadyFlag(activeFlagInterface, SongManager.GetSingleton().GetActiveSong().GetCurrentTempo());
+    }
+
     #endregion
+
+    #endregion
+
+    #region Interface and Timeout
+
+    private IEnumerator InterfaceRoutine(FlagInterface flag, TimeOutFlag timeOutFlag)
+    {
+        while (tcpClient != null)
+        {
+            yield return new WaitForEndOfFrame();
+            while (flag.gameInterfaceFlags.Count != 0)
+            {
+                var processed = flag.gameInterfaceFlags.Dequeue();
+                switch (processed.interfaceMessage)
+                {
+                    case InterfaceMessage.resetTimeout:
+                        timeOutFlag.resetTimer = true;
+                        break;
+                    case InterfaceMessage.raiseError:
+                        ErrorScene.LoadError(processed.msg);
+                        break;
+                    case InterfaceMessage.gameStart:
+                        SceneManager.LoadScene("Game");
+                        latestOpponentName = processed.msg;
+                        break;
+                    case InterfaceMessage.enableQueueMenu:
+                        MenuUX.GetSingleton().RevealQueue();
+                        break;
+                    case InterfaceMessage.updateEnqueuedNumber:
+                        MenuUX.GetSingleton().UpdateEnqueuedNumber((int)processed.val);
+                        break;
+                    case InterfaceMessage.updateGameServerPos:
+                        GameManager.GetSingleton().UpdateServerPos(processed.val);
+                        break;
+                    case InterfaceMessage.updateGameOpponentPos:
+                        GameManager.GetSingleton().UpdateOpponentPos(processed.val);
+                        break;
+                }
+            }
+        }
+    }
 
     private IEnumerator TimeOutRoutine(TimeOutFlag flag)
     {
@@ -242,35 +318,14 @@ public class Client : MonoBehaviour
                     yield break;
                 }
             }
-            EnqueueCloseFlag(activeFlagInterface);
+            EnqueueClientThreadCloseFlag(activeFlagInterface);
+            EnqueueErrorFlag(activeFlagInterface, "Connection to server timed out.");
         }
     }
 
-    private IEnumerator InterfaceRoutine(FlagInterface flag, TimeOutFlag timeOutFlag)
-    {
-        while (tcpClient != null)
-        {
-            yield return new WaitForEndOfFrame();
-            while (flag.gameInterfaceFlags.Count != 0)
-            {
-                var processed = flag.gameInterfaceFlags.Dequeue();
-                switch (processed.interfaceMessage)
-                {
-                    case InterfaceMessage.resetTimeout:
-                        timeOutFlag.resetTimer = true;
-                        break;
-                    case InterfaceMessage.raiseError:
-                        ErrorScene.LoadError(processed.msg);
-                        break;
-                }
-            }
-        }
-    }
 
-    private void OnTimeOut()
-    {
 
-    }
+    #endregion
 
     #endregion
 
@@ -328,20 +383,62 @@ public class Client : MonoBehaviour
     {
         flagInterface.EnqueueInterfaceFlag(new InterfaceDataFlag(InterfaceMessage.resetTimeout, 0, ""));
     }
+    private static void EnqueueQueueMenuActivation(FlagInterface flagInterface)
+    {
+        flagInterface.EnqueueInterfaceFlag(new InterfaceDataFlag(InterfaceMessage.enableQueueMenu, 0, ""));
+    }
 
     private static void EnqueueErrorFlag(FlagInterface flagInterface, string e)
     {
         flagInterface.EnqueueInterfaceFlag(new InterfaceDataFlag(InterfaceMessage.raiseError, 0, e));
     }
 
+    private static void EnqueueGameStartFlag(FlagInterface flagInterface, string opp)
+    {
+        flagInterface.EnqueueInterfaceFlag(new InterfaceDataFlag(InterfaceMessage.gameStart, 0, opp));
+    }
+
+    private static void EnqueueUpdateEnqueuedNumber(FlagInterface flagInterface, int num)
+    {
+        flagInterface.EnqueueInterfaceFlag(new InterfaceDataFlag(InterfaceMessage.updateEnqueuedNumber, num, ""));
+    }
+
+    private static void EnqueueUpdateServerPos(FlagInterface flagInterface, float val)
+    {
+        flagInterface.EnqueueInterfaceFlag(new InterfaceDataFlag(InterfaceMessage.updateGameServerPos, val, ""));
+    }
+
+    private static void EnqueueUpdateOpponentPos(FlagInterface flagInterface, float val)
+    {
+        flagInterface.EnqueueInterfaceFlag(new InterfaceDataFlag(InterfaceMessage.updateGameOpponentPos, val, ""));
+    }
 
     #endregion
 
     #region Common Client Flags
 
-    private static void EnqueueCloseFlag(FlagInterface flagInterface)
+    private static void EnqueueClientThreadCloseFlag(FlagInterface flagInterface)
     {
         flagInterface.EnqueueClientThreadFlag(new ClientThreadFlag(ClientThreadMessage.close, 0, ""));
+    }
+
+    private static void EnqueueClientThreadGameReadyFlag(FlagInterface flagInterface, float initTempo)
+    {
+        flagInterface.EnqueueClientThreadFlag(new ClientThreadFlag(ClientThreadMessage.ready, initTempo, ""));
+    }
+
+    private static void EnqueueUpdatePlayerPos(FlagInterface flagInterface, float val)
+    {
+        flagInterface.EnqueueClientThreadFlag(new ClientThreadFlag(ClientThreadMessage.updateGamePlayerPos, val, ""));
+    }
+
+    #endregion
+
+    #region Within Client Requests
+
+    public static void UpdatePlayerPos(float val)
+    {
+        EnqueueUpdatePlayerPos(activeFlagInterface, val);
     }
 
     #endregion
@@ -395,7 +492,7 @@ public class Client : MonoBehaviour
         }
     }
 
-    private enum InterfaceMessage { resetTimeout, raiseError }
-    private enum ClientThreadMessage { close, enqueue }
+    private enum InterfaceMessage { resetTimeout, raiseError, gameStart, enableQueueMenu, updateEnqueuedNumber, updateGameServerPos, updateGameOpponentPos }
+    private enum ClientThreadMessage { close, enqueue, ready, updateGamePlayerPos }
 }
 

@@ -10,7 +10,7 @@ public class Song_Mapping : MonoBehaviour
     [Serializable]
     public struct expectedKey {
         public float timeToHit;
-        public int index;
+        public char index;
         public float timeToHold;
     };
 
@@ -19,7 +19,12 @@ public class Song_Mapping : MonoBehaviour
     expectedKey dummy;
     float holdTolerancePoint;
     Song callMethod;
-    int indexArray = 0;
+    public int indexArray = 0;
+    float timeDummy;
+    int counter;
+    float holdLeft;
+    public GameObject cicle;
+    public Transform targetKeys;
     #endregion
     Dictionary<float, List<expectedKey>> secondToKeys = new Dictionary<float, List<expectedKey>>();
     private void Start()
@@ -64,10 +69,10 @@ public class Song_Mapping : MonoBehaviour
     private void Update()
     {
         timeCounter += Time.deltaTime;
-        
-        if( timeCounter >= keyToHit[indexArray].timeToHit )
+        if( timeCounter >= keyToHit[indexArray].timeToHit)
         {
-
+            //Burada hangi buttondan çıktığını belirleyen bir index olmalı
+            Instantiate(cicle,targetKeys.position,Quaternion.identity);
         }
     }
 
