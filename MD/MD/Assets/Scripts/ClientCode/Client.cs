@@ -202,6 +202,9 @@ public class Client : MonoBehaviour
                         case "MD GAME-OPP":
                             EnqueueUpdateOpponentPos(flagInterface, valuePassed);
                             break;
+                        case "MD GAME-LOC":
+                            EnqueueUpdateLocalPlayerPos(flagInterface, valuePassed);
+                            break;
                         default:
                             EnqueueErrorFlag(flagInterface, "Unexpected response from server: " + response);
                             break;
@@ -293,6 +296,9 @@ public class Client : MonoBehaviour
                         break;
                     case InterfaceMessage.updateGameOpponentPos:
                         GameManager.GetSingleton().UpdateOpponentPos(processed.val);
+                        break;
+                    case InterfaceMessage.updateLocalPlayerPos:
+                        GameManager.GetSingleton().UpdateLocalPlayerPos(processed.val);
                         break;
                 }
             }
@@ -413,6 +419,11 @@ public class Client : MonoBehaviour
         flagInterface.EnqueueInterfaceFlag(new InterfaceDataFlag(InterfaceMessage.updateGameOpponentPos, val, ""));
     }
 
+    private static void EnqueueUpdateLocalPlayerPos(FlagInterface flagInterface, float val)
+    {
+        flagInterface.EnqueueInterfaceFlag(new InterfaceDataFlag(InterfaceMessage.updateLocalPlayerPos, val, ""));
+    }
+
     #endregion
 
     #region Common Client Flags
@@ -492,7 +503,7 @@ public class Client : MonoBehaviour
         }
     }
 
-    private enum InterfaceMessage { resetTimeout, raiseError, gameStart, enableQueueMenu, updateEnqueuedNumber, updateGameServerPos, updateGameOpponentPos }
+    private enum InterfaceMessage { resetTimeout, raiseError, gameStart, enableQueueMenu, updateEnqueuedNumber, updateGameServerPos, updateGameOpponentPos, updateLocalPlayerPos }
     private enum ClientThreadMessage { close, enqueue, ready, updateGamePlayerPos }
 }
 

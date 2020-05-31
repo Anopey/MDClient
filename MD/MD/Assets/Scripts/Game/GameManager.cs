@@ -94,6 +94,11 @@ public class GameManager : MonoBehaviour
         opponentSlider.value = val;
     }
 
+    public void UpdateLocalPlayerPos(float val)
+    {
+        mySlider.value = val;
+    }
+
 
     #endregion
 

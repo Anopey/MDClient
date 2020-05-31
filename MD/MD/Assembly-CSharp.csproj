@@ -72,6 +72,7 @@
     <Compile Include="Assets\Scripts\Game\GameManager.cs" />
     <Compile Include="Assets\Scripts\Game\Song.cs" />
     <Compile Include="Assets\Scripts\Game\SongManager.cs" />
+    <Compile Include="Assets\Scripts\Slider_Manager.cs" />
     <Compile Include="Assets\Scripts\Song_Mapping.cs" />
     <Compile Include="Assets\Scripts\UX\MenuUX.cs" />
     <Compile Include="Assets\Scripts\Utilities\ErrorScene.cs" />

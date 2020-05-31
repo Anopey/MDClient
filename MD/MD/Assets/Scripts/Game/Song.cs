@@ -35,7 +35,7 @@ public class Song : MonoBehaviour
 
     public float GetCurrentTempo()
     {
-        return 400;
+        return 1200;
     }
 
     #endregion
