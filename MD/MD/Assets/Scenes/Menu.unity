@@ -206,7 +206,7 @@ GameObject:
   - component: {fileID: 29107043}
   - component: {fileID: 29107042}
   m_Layer: 5
-  m_Name: Text (1)
+  m_Name: queueText
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -262,7 +262,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: Currently x  player are online
+  m_Text: 0 players currently are online.
 --- !u!222 &29107043
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -562,7 +562,7 @@ GameObject:
   - component: {fileID: 386591577}
   - component: {fileID: 386591576}
   m_Layer: 5
-  m_Name: Text
+  m_Name: Queue Information Text
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2002,7 +2002,7 @@ GameObject:
   - component: {fileID: 1783035337}
   - component: {fileID: 1783035336}
   m_Layer: 5
-  m_Name: Text
+  m_Name: Info Text
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2360,6 +2360,7 @@ MonoBehaviour:
   nameField: {fileID: 979683942}
   regularIPToggle: {fileID: 2062226599}
   infoText: {fileID: 1783035336}
+  queueText: {fileID: 29107042}
 --- !u!1 &2058530892
 GameObject:
   m_ObjectHideFlags: 0

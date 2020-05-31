@@ -21,7 +21,7 @@ public class MenuUX : MonoBehaviour
     private Toggle regularIPToggle;
 
     [SerializeField]
-    private Text infoText;
+    private Text infoText, queueText;
 
     private const string RegularServerIP = "185.163.47.170";
 
@@ -157,7 +157,7 @@ public class MenuUX : MonoBehaviour
 
     public void UpdateEnqueuedNumber(int enqueued)
     {
-
+        queueText.text = enqueued.ToString() + " players currently are online.";
     }
 
     #endregion

@@ -153,17 +153,34 @@ public class Client : MonoBehaviour
             {
 
                 string response = ReadFromServer();
+
                 lock (_clientBoiBusy)
                 {
                     response = response.Substring(0, response.Length - 1); //get rid of the \n
+                    var fields = response.Split(' ');
+                    float valuePassed = 0;
+                    if (fields.Length == 3)
+                    {
+                        if(!float.TryParse(fields[2], out valuePassed)){
+                            Debug.LogError("Invalid response from server: " + response);
+                            continue;
+                        }
+                    }
                     EnqueueNoTimeoutFlag(flagInterface);
-                    switch (response)
+                    string eval = fields[0] + " " + fields[1];
+                    switch (eval)
                     {
                         case "MD INVALID":
                             EnqueueErrorFlag(flagInterface, "Server responded with " + response);
                             break;
                         case "MD NO TIMEOUT":
                             WriteToServer("MD NO TIMEOUT\n");
+                            break;
+                        case "MD QUEUE":
+                            if(MenuUX.GetSingleton() != null)
+                            {
+                                MenuUX.GetSingleton().UpdateEnqueuedNumber((int)valuePassed);
+                            }
                             break;
                         default:
                             EnqueueErrorFlag(flagInterface, "Unexpected response from server: " + response);
